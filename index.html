@@ -1,0 +1,234 @@
+<html>
+<head>
+<title>Mouse Mover</title>
+<meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1, maximum-scale=1">
+<style>
+	body {
+		font-family: helvetica, arial, sans serif;background-color: #5E6F89;color: white;
+		min-height: 100%;
+		max-height: 100%;
+
+		-webkit-user-select: none;
+		-moz-user-select: none;
+		-ms-user-select: none;
+
+		cursor: default;
+	}
+
+	#arrow {
+		/*position: absolute;
+		left: 50%;
+  	top: 50%;
+  	margin: -24px;*/
+		font-size: 48px;
+
+		text-align: center;
+		vertical-align: middle;
+  }
+
+	.btn {
+		margin: 0 auto;
+
+		background-color: #5E6F89;
+
+		width: 200px;
+		height: 70px;
+		line-height: 70px;
+
+		border: 2px solid;
+		border-radius: 30px;
+
+		text-align: center;
+		vertical-align: middle;
+
+		cursor: hand;
+	}
+
+	#content {
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		margin: -250px;
+		/*text-align: center;
+		vertical-align: middle;*/
+		width: 500px;
+		height: 500px;
+	}
+
+	#X, #Y {
+		text-align: right;
+		width: 50%;
+		float: right;
+	}
+</style>
+
+</head>
+<body>
+<div id='content'>
+	<h3>Hold your device vertically and lock screen rotation</h3>
+	<h3>Tilt to control the mouse</h3>
+	<h3>Tap to Click</h3>
+	<h3>Two-Finger-Tap to Right-Click</h3>
+
+	<span id='serverconnection'>Connecting to server...</span>
+	<br/><br/>
+	<span id='devicetype'>Device: ?</span>
+	<!-- <br/>
+	X : <span id='X'>?</span>
+	<br/>
+	Y : <span id='Y'>?</span> -->
+
+	<br/>
+	<div id='arrow'>↑</div>
+	<br/>
+
+	<!-- <div class='btn' onclick='disconnectFromServer()'>
+		Disconnect
+	</div>
+	<br/> -->
+	<div id='pauseBtn' class='btn' onclick='pauseControl()'>
+		Pause
+	</div>
+	<br/>
+	<div id='killBtn' class='btn' onclick='killServer()'>
+		Kill Server
+	</div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+	var deviceType = 0; // 0 for iOS, 1 for Android, others not supported yet.
+
+	var host = window.location.hostname;
+
+	var socket = io.connect(host);
+
+	socket.on('connect', function (){
+			document.getElementById("serverconnection").innerHTML = 'Connected to server';
+
+		if ( /iPhone|iPad|iPod/i.test(navigator.userAgent) ) {
+			document.getElementById("devicetype").innerHTML = 'Device: iPhone/iPad/iPod';
+		} else if ( /Android/i.test(navigator.userAgent) ) {
+			deviceType = 1;
+			document.getElementById("devicetype").innerHTML = 'Device: Android';
+		} else { // /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+			document.getElementById("devicetype").innerHTML = 'Device: not Android/iPhone/iPad';
+		}
+
+	});
+
+	socket.on('disconnect', function (){ document.getElementById("serverconnection").innerHTML = 'Disconnected from server'; });
+
+	//function disconnectFromServer() {
+		//socket.emit('disconnectCommand', {});
+			//socket.disconnect();
+	//}
+
+	function pauseControl() {
+		var el = document.getElementById("pauseBtn");
+
+		if (el.innerHTML == 'Resume') {
+			el.innerHTML = 'Pause';
+			socket.emit('resumeControl');
+		} else {
+			el.innerHTML = 'Resume';
+			socket.emit('pauseControl');
+		}
+	}
+
+	function killServer() {
+		socket.emit('killServer');
+
+		// document.getElementById("killBtn").style.display = 'none';
+		// document.getElementById("pauseBtn").style.display = 'none';
+		var el = document.getElementById("content");
+		el.style.textAlign="center";
+		el.innerHTML = '<h1>Restart the server to regain your control!</H1>';
+	}
+
+window.addEventListener("touchstart", handleTap, false);
+
+function handleTap(e) {
+	if (e.touches.length == 1) {
+		socket.emit('tap', {'msg': 'just tapped the window!'});
+	}
+	if (e.touches.length == 2) {
+		socket.emit('twoFingerTap', {'msg': 'twoFingerTap!'});
+	}
+	if (e.touches.length == 3) {
+		socket.emit('threeFingerTap', {'msg': 'threeFingerTap!'});
+	}
+}
+
+function rotateArrow(x, y) {
+	var th = 2;
+	var rth = 1.25;
+	var wth = 3;
+
+	var xy = Math.abs(x/y);
+	var yx = Math.abs(y/x);
+
+	if (x > th && xy > rth)
+		document.getElementById("arrow").innerHTML = "→";
+	else if (x < -th && xy > rth)
+		document.getElementById("arrow").innerHTML = "←";
+	else if (y < -th && yx > rth)
+		document.getElementById("arrow").innerHTML = "↑";
+	else if (y > th && yx > rth)
+		document.getElementById("arrow").innerHTML = "↓";
+
+	/*if (x > th && y > th && Math.abs(x - y) < wth)
+		document.getElementById("arrow").innerHTML = "↘";
+	else if (x < -th && y < -th && Math.abs(x - y) < wth)
+		document.getElementById("arrow").innerHTML = "↖";
+	else if (x > th && y < -th && Math.abs(x - y) < wth)
+		document.getElementById("arrow").innerHTML = "↙";
+	else if (x < -th && y > th && Math.abs(x - y) < wth)
+		document.getElementById("arrow").innerHTML = "↗";*/
+}
+
+var x = 0, y = 0, xPrev = 0, yPrev = 0;
+
+if (window.DeviceMotionEvent) {
+
+	var canvas = document.getElementById('arrow');
+
+	window.ondevicemotion = function(e) {
+
+		if (!event.accelerationIncludingGravity.x || !event.accelerationIncludingGravity.y) {return;};
+
+		x = event.accelerationIncludingGravity.x.toFixed(2);
+		y = event.accelerationIncludingGravity.y.toFixed(2);
+
+//		document.getElementById("X").innerHTML = x; //Math.round(x);
+//		document.getElementById("Y").innerHTML = y; //Math.round(y);
+
+		if (x != undefined && y != undefined) {
+
+			if (x == 0) { x = 0;}
+			if (y == 0) { y = 0;}
+			if (x != xPrev || y != yPrev) {
+				xPrev = x;
+				yPrev = y;
+
+				if (deviceType == 0) {
+					socket.emit('mouseMoveRelative', {'ax': x, 'ay': -y}); // invert y for iOS.
+					rotateArrow(x, -y);
+				} else { // deviceType == 1, more device types will be added later.
+					socket.emit('mouseMoveRelative', {'ax': -x, 'ay': y}); // invert x for Android, Nexus 7.
+					rotateArrow(-x, y);
+				}
+			}
+		}
+	}
+} else {
+		document.getElementById("devicemessage").innerHTML = 'ERROR: This page relies on DeviceMotionEvent, but your device does not support it :(';
+}
+
+</script>
+
+
+
+</body>
+</html>
